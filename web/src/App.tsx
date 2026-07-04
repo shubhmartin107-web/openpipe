@@ -79,11 +79,12 @@ export default function App({}: AppProps) {
         }
       }
     }
-    sourceNames.forEach((name, i) => {
+    let idx = 0;
+    sourceNames.forEach((name) => {
       allNodes.push({
         id: name,
         type: 'default',
-        position: { x: 50, y: i * 100 + 50 },
+        position: { x: 50, y: idx * 100 + 50 },
         data: {
           label: name.split('.').pop() || name,
           type: 'source',
@@ -97,6 +98,7 @@ export default function App({}: AppProps) {
           fontSize: 12,
         },
       })
+      idx++
     })
 
     // Model nodes
@@ -276,7 +278,7 @@ export default function App({}: AppProps) {
                     <span style={{ color: '#64748b', marginLeft: 8 }}>
                       ({lin.transformation_type}/{lin.transformation_subtype})
                     </span>
-                    {lin.input_fields.length > 0 && (
+                    {lin.input_fields && lin.input_fields.length > 0 && (
                       <div style={{ marginTop: 4, color: '#94a3b8', fontSize: 11 }}>
                         ← {lin.input_fields.map(f => `${f.dataset}.${f.field}`).join(', ')}
                       </div>

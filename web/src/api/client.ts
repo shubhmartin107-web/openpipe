@@ -21,6 +21,8 @@ export interface CompileResponse {
 }
 
 export interface ColumnLineage {
+  transformation_type: string
+  transformation_subtype: string
   input_fields: Array<{
     dataset: string
     field: string
