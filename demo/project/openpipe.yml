@@ -1,0 +1,108 @@
+name: retail_demo
+
+profile:
+  target: dev
+  outputs:
+    dev:
+      type: spark
+      catalog: openpipe
+      schema: analytics
+      threads: 4
+
+models:
+  - name: stg_customers
+    config:
+      materialized: view
+      tags: ["staging"]
+
+  - name: stg_orders
+    config:
+      materialized: view
+      tags: ["staging"]
+
+  - name: stg_payments
+    config:
+      materialized: view
+      tags: ["staging"]
+
+  - name: dim_customers
+    config:
+      materialized: table
+      tags: ["dimension"]
+
+  - name: fct_orders
+    config:
+      materialized: incremental
+      unique_key: order_id
+      tags: ["fact"]
+
+  - name: customer_metrics
+    config:
+      materialized: table
+      tags: ["mart"]
+
+sources:
+  - name: raw
+    schema: raw
+    database: openpipe
+    tables:
+      - name: customers
+        columns:
+          - name: id
+            tests:
+              - not_null: {}
+              - unique: {}
+          - name: email
+            tests:
+              - not_null: {}
+      - name: orders
+        columns:
+          - name: id
+            tests:
+              - not_null: {}
+              - unique: {}
+      - name: payments
+        columns:
+          - name: id
+            tests:
+              - not_null: {}
+              - unique: {}
+
+tests:
+  - name: not_null_customer_id_dim
+    model_name: dim_customers
+    type: not_null
+    column_name: customer_id
+
+  - name: unique_customer_id_dim
+    model_name: dim_customers
+    type: unique
+    column_name: customer_id
+
+  - name: not_null_order_id_fct
+    model_name: fct_orders
+    type: not_null
+    column_name: order_id
+
+  - name: unique_order_id_fct
+    model_name: fct_orders
+    type: unique
+    column_name: order_id
+
+  - name: accepted_status_values
+    model_name: fct_orders
+    type: accepted_values
+    column_name: status
+    values: ["placed", "shipped", "completed", "returned"]
+
+  - name: relationship_customer_fk
+    model_name: fct_orders
+    type: relationships
+    column_name: customer_id
+    to: dim_customers
+    field: customer_id
+
+  - name: amount_non_negative
+    model_name: fct_orders
+    type: custom
+    sql: "SELECT * FROM fct_orders WHERE amount < 0"

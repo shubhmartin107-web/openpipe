@@ -1,0 +1,14 @@
+target/
+go-scheduler/openpipe-scheduler
+go-scheduler/openpipe
+web/node_modules/
+web/dist/
+.openpipe/output/
+*.pyc
+__pycache__/
+.direnv/
+.env
+.DS_Store
+*.swp
+*.swo
+*~

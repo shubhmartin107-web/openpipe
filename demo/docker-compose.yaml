@@ -1,0 +1,72 @@
+version: "3.9"
+
+services:
+  # Lakehouse storage
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: openpipe
+      MINIO_ROOT_PASSWORD: openpipe123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+
+  # Spark with Iceberg (lakehouse SQL engine)
+  spark-iceberg:
+    image: tabulario/spark-iceberg:latest
+    ports:
+      - "10000:10000"  # Spark Thrift JDBC
+      - "4040:4040"    # Spark UI
+    depends_on:
+      - minio
+    environment:
+      AWS_ACCESS_KEY_ID: openpipe
+      AWS_SECRET_ACCESS_KEY: openpipe123
+      AWS_REGION: us-east-1
+
+  # OpenPipe Rust engine (compilation service)
+  openpipe-engine:
+    build:
+      context: ../rust-engine
+      dockerfile: Dockerfile
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../demo/project:/project
+    environment:
+      RUST_LOG: info
+    command: ["./openpipe-engine"]
+
+  # OpenPipe Go scheduler
+  openpipe-scheduler:
+    build:
+      context: ../go-scheduler
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"  # REST API
+      - "8081:8081"  # MCP
+    depends_on:
+      - openpipe-engine
+      - spark-iceberg
+    environment:
+      OPENPIPE_ENGINE_URL: http://openpipe-engine:9090
+      OPENPIPE_SQL_DRIVER: spark
+      OPENPIPE_SQL_CONN: "thrift://spark-iceberg:10000"
+
+  # Web UI
+  openpipe-web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - openpipe-scheduler
+    environment:
+      VITE_API_URL: http://localhost:8080
+
+volumes:
+  minio-data:

@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust-engine:
+    name: Rust Engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - run: cargo check -p openpipe-engine
+        working-directory: .
+      - run: cargo test -p openpipe-engine
+        working-directory: .
+      - run: cargo build --release -p openpipe-engine
+        working-directory: .
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: openpipe-engine
+          path: target/release/openpipe-engine
+
+  go-scheduler:
+    name: Go Scheduler
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - run: go build ./cmd/openpipe
+        working-directory: go-scheduler
+      - run: go vet ./...
+        working-directory: go-scheduler
+      - run: go test ./... -count=1 -v
+        working-directory: go-scheduler
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: openpipe-scheduler
+          path: go-scheduler/openpipe
+
+  web-ui:
+    name: Web UI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [rust-engine, go-scheduler]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+      - name: Build Rust engine
+        run: cargo build --release -p openpipe-engine
+      - name: Start engine
+        run: |
+          ./target/release/openpipe-engine &
+          sleep 3
+          curl -s http://localhost:9090/api/v1/health
+      - name: Load demo project
+        run: |
+          curl -s -X POST http://localhost:9090/api/v1/project/load \
+            -H "Content-Type: application/json" \
+            -d '{"path": "${{ github.workspace }}/demo/project"}' | head -c 500
+      - name: Compile all models
+        run: |
+          curl -s -X POST http://localhost:9090/api/v1/compile \
+            -H "Content-Type: application/json" \
+            -d '{"full_refresh": true}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'OK: {len(d[\"models\"])} models compiled')"
+      - name: Get lineage
+        run: |
+          curl -s -X POST http://localhost:9090/api/v1/lineage \
+            -H "Content-Type: application/json" \
+            -d '{}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'OK: {len(d[\"models\"])} lineage models')"
+      - name: Compile tests
+        run: |
+          curl -s -X POST http://localhost:9090/api/v1/tests/compile \
+            -H "Content-Type: application/json" \
+            -d '{}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'OK: {len(d[\"tests\"])} tests compiled')"
+      - name: Get test suite
+        run: |
+          curl -s -X POST http://localhost:9090/api/v1/tests/suite \
+            -H "Content-Type: application/json" \
+            -d '{}' | python3 -c "import sys,json; d=json.load(sys.stdin); s=d['summary']; print(f\"{s['passed']}/{s['total']} passed ({s['pass_rate']:.0f}%)\")"
+      - name: Get model types
+        run: |
+          curl -s http://localhost:9090/api/v1/models/types | python3 -c "import sys,json; d=json.load(sys.stdin); [print(f'  {m[\"name\"]}: {m[\"language\"]} ({m[\"materialization\"]})') for m in d['models']]"

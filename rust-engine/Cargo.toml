@@ -1,0 +1,39 @@
+[package]
+name = "openpipe-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+axum = { version = "0.8", features = ["json", "tracing"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# SQL parsing
+sqlparser = "0.55"
+
+# Jinja2 templating
+minijinja = { version = "2", features = ["builtins", "macros"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1"
+
+# Data types
+uuid = { version = "1", features = ["v7", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+schemars = "1"
+
+# Errors
+thiserror = "2"
+anyhow = "1"
+
+# Utilities
+glob = "0.3"
+regex = "1"
+url = "2"
+indexmap = { version = "2", features = ["serde"] }
